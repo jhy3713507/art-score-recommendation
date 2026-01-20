@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>山东省2026年美术类本科志愿推荐系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-gray-50 text-gray-900">
+    <div id="app" class="container mx-auto px-4 py-8 max-w-6xl">
+        <header class="text-center mb-10">
+            <h1 class="text-3xl font-bold text-blue-800 mb-2">山东省2026年美术类本科志愿推荐系统</h1>
+            <p class="text-gray-600">基于官方投档数据，科学规划您的志愿填报</p>
+        </header>
+
+        <!-- 分数输入与推荐功能 -->
+        <section class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold border-l-4 border-blue-600 pl-3">分数输入与计算</h2>
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-2 text-xs bg-orange-50 text-orange-700 px-3 py-1.5 rounded border border-orange-200">
+                        <label class="font-medium whitespace-nowrap">参考专业分设定:</label>
+                        <input v-model.number="referenceArtScore" type="number" 
+                               class="w-16 bg-white border-orange-300 rounded px-1 py-0.5 focus:ring-orange-500 focus:border-orange-500 text-center font-bold">
+                    </div>
+                    <div class="text-xs bg-gray-100 text-gray-500 px-2 py-1.5 rounded">
+                        数据版本：2025年第一批次投档
+                    </div>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">美术专业分 (0-300)</label>
+                    <input v-model.number="scores.art" type="number" min="0" max="300" 
+                           class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2 border text-lg"
+                           placeholder="0-300">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">文化课分数 (0-750)</label>
+                    <input v-model.number="scores.culture" type="number" min="0" max="750" 
+                           class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2 border text-lg"
+                           placeholder="0-750">
+                </div>
+                <div class="flex gap-2">
+                    <button @click="calculateAndRecommend" 
+                            class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-md transition shadow-sm">
+                        开始推荐
+                    </button>
+                    <button @click="resetForm" 
+                            class="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-md transition">
+                        重置
+                    </button>
+                </div>
+                <div class="text-sm text-gray-500 pb-2">
+                    <p>公式：专业分×1.25 + 文化分×0.5</p>
+                    <p class="mt-1">综合分 = <span class="text-blue-600 font-bold">{{ userCompositeScore > 0 ? userCompositeScore.toFixed(2) : '--' }}</span></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 推荐结果展示 -->
+        <section v-if="recommendations.length > 0" class="bg-white rounded-lg shadow-md p-6 mb-8 overflow-hidden">
+            <div class="flex justify-between items-center mb-4 border-l-4 border-green-600 pl-3">
+                <h2 class="text-xl font-semibold">推荐院校专业 (共{{ filteredRecommendations.length }}条)</h2>
+                <div class="hidden md:flex gap-4">
+                    <span class="flex items-center text-xs text-gray-500"><span class="w-2 h-2 bg-green-500 rounded-full mr-1"></span> 非常稳妥(>10分)</span>
+                    <span class="flex items-center text-xs text-gray-500"><span class="w-2 h-2 bg-blue-500 rounded-full mr-1"></span> 较稳妥(5-10分)</span>
+                    <span class="flex items-center text-xs text-gray-500"><span class="w-2 h-2 bg-yellow-500 rounded-full mr-1"></span> 有风险(<5分)</span>
+                </div>
+            </div>
+
+            <!-- 结果筛选 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </span>
+                    <input v-model="recommendationFilter" type="text" placeholder="在结果中搜索院校或专业..." 
+                           class="pl-10 w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 p-2 border text-sm">
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="text-sm text-gray-600 whitespace-nowrap">省份筛选:</label>
+                    <select v-model="selectedProvince" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 p-2 border text-sm">
+                        <option value="">全部省份</option>
+                        <option v-for="p in availableProvinces" :key="p" :value="p">{{ p }}</option>
+                    </select>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">院校名称</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">专业名称</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最低综合分</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">分差</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">文化参考分*</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">计划数</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">建议</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr v-for="item in paginatedRecommendations" :key="item.college_code_name + item.major_code_name" class="hover:bg-gray-50 cursor-pointer" @click="showDetail(item)">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded mr-1">{{ item.province }}</span>
+                                {{ item.college_code_name }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.major_code_name }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.min_composite_score }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold" :class="item.diff >= 5 ? 'text-green-600' : 'text-orange-600'">
+                                +{{ item.diff.toFixed(2) }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
+                                {{ calcRefCultureScore(item.min_composite_score) }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.admission_plan }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                <span v-if="item.diff >= 10" class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">非常稳妥</span>
+                                <span v-else-if="item.diff >= 5" class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">较稳妥</span>
+                                <span v-else class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">有风险</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页控制 -->
+            <div v-if="totalPages > 1" class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t pt-4">
+                <div class="text-sm text-gray-500">
+                    显示第 {{ (currentPage - 1) * 20 + 1 }} 到 {{ Math.min(currentPage * 20, filteredRecommendations.length) }} 条，共 {{ filteredRecommendations.length }} 条
+                </div>
+                <div class="flex gap-1">
+                    <button @click="currentPage--" :disabled="currentPage === 1" 
+                            class="px-3 py-1 border rounded hover:bg-gray-100 disabled:opacity-50 transition">上一页</button>
+                    
+                    <template v-for="p in totalPages" :key="p">
+                        <button v-if="p === 1 || p === totalPages || (p >= currentPage - 2 && p <= currentPage + 2)"
+                                @click="currentPage = p"
+                                :class="currentPage === p ? 'bg-green-600 text-white border-green-600' : 'hover:bg-gray-100'"
+                                class="px-3 py-1 border rounded transition min-w-[38px]">
+                            {{ p }}
+                        </button>
+                        <span v-else-if="(p === 2 && currentPage > 4) || (p === totalPages - 1 && currentPage < totalPages - 3)" 
+                              class="px-2 py-1">...</span>
+                    </template>
+
+                    <button @click="currentPage++" :disabled="currentPage === totalPages"
+                            class="px-3 py-1 border rounded hover:bg-gray-100 disabled:opacity-50 transition">下一页</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 院校查询功能 -->
+        <section class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4 border-l-4 border-purple-600 pl-3">院校专业查询</h2>
+            <div class="mb-4">
+                <div class="relative">
+                    <input v-model="searchQuery" type="text" placeholder="输入院校名称进行模糊搜索..." 
+                           class="w-full border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 p-2 border">
+                </div>
+            </div>
+            <div v-if="filteredColleges.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div v-for="college in filteredColleges" :key="college" 
+                     class="border rounded-lg p-4 hover:border-purple-500 hover:shadow-sm cursor-pointer transition"
+                     @click="selectCollege(college)">
+                    <div class="font-bold text-gray-800">{{ college }}</div>
+                    <div class="text-xs text-gray-500 mt-1">点击查看该校所有专业投档线</div>
+                </div>
+            </div>
+            <div v-else class="text-center py-10 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed">
+                没有找到匹配的院校，请尝试其他关键词
+            </div>
+        </section>
+
+        <!-- 详情弹窗 -->
+        <div v-if="selectedMajor" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 relative">
+                <button @click="selectedMajor = null" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                <h3 class="text-2xl font-bold text-blue-800 mb-2">{{ selectedMajor.college_code_name }}</h3>
+                <h4 class="text-xl font-semibold text-gray-700 mb-4">{{ selectedMajor.major_code_name }}</h4>
+                
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="bg-gray-50 p-3 rounded">
+                        <div class="text-gray-500 text-sm">投档计划数</div>
+                        <div class="text-xl font-bold">{{ selectedMajor.admission_plan }}</div>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded">
+                        <div class="text-gray-500 text-sm">最低投档分 (综合)</div>
+                        <div class="text-xl font-bold text-blue-600">{{ selectedMajor.min_composite_score }}</div>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded">
+                        <div class="text-gray-500 text-sm">文化课要求参考*</div>
+                        <div class="text-xl font-bold text-orange-600">{{ calcRefCultureScore(selectedMajor.min_composite_score) }}</div>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded">
+                        <div class="text-gray-500 text-sm">年份数据</div>
+                        <div class="text-xl font-bold">2025年第一次投档</div>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-400 mt-2">* 文化课最低要求参考是基于当前设定的美术专业分 {{ referenceArtScore }} 分计算的。</p>
+                
+                <div class="mt-6 border-t pt-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <h5 class="font-semibold">该校其他专业:</h5>
+                        <div class="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-200">
+                            历年趋势：稳定
+                        </div>
+                    </div>
+                    <div class="space-y-2 max-h-40 overflow-y-auto">
+                        <div v-for="m in getOtherMajors(selectedMajor.college_code_name)" :key="m.major_code_name" 
+                             class="text-sm p-2 bg-gray-50 hover:bg-blue-50 border border-transparent hover:border-blue-200 rounded flex justify-between cursor-pointer transition-colors"
+                             @click="showDetail(m)">
+                            <span>{{ m.major_code_name }}</span>
+                            <span class="font-medium text-blue-600">{{ m.min_composite_score }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-12 text-center text-gray-400 text-sm pb-8">
+            <p>© 2026 山东省艺术类高考志愿填报辅助工具</p>
+            <p class="mt-1">数据来源：官方公布第一次志愿投档数据 | 仅供参考，请以官方最终发布为准</p>
+        </footer>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
