@@ -136,13 +136,13 @@
                             class="px-3 py-1 border rounded hover:bg-gray-100 disabled:opacity-50 transition">上一页</button>
                     
                     <template v-for="p in totalPages" :key="p">
-                        <button v-if="p === 1 || p === totalPages || (p >= currentPage - 2 && p <= currentPage + 2)"
+                        <button v-if="p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2"
                                 @click="currentPage = p"
                                 :class="currentPage === p ? 'bg-green-600 text-white border-green-600' : 'hover:bg-gray-100'"
                                 class="px-3 py-1 border rounded transition min-w-[38px]">
                             {{ p }}
                         </button>
-                        <span v-else-if="(p === 2 && currentPage > 4) || (p === totalPages - 1 && currentPage < totalPages - 3)" 
+                        <span v-else-if="p === currentPage - 3 || p === currentPage + 3" 
                               class="px-2 py-1">...</span>
                     </template>
 

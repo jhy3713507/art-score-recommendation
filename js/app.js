@@ -1,5 +1,14 @@
 const { createApp, ref, computed, onMounted, watch } = Vue;
 
+// 省份列表常量
+const PROVINCE_LIST = ['北京', '天津', '河北', '山西', '内蒙古', '辽宁', '吉林', '黑龙江', '上海', '江苏', '浙江', '安徽', '福建', '江西', '山东', '河南', '湖北', '湖南', '广东', '广西', '海南', '重庆', '四川', '贵州', '云南', '西藏', '陕西', '甘肃', '青海', '宁夏', '新疆'];
+
+// 分页显示范围常量
+const PAGINATION_RANGE = 2;
+
+// 默认显示院校数量
+const DEFAULT_COLLEGE_DISPLAY = 12;
+
 createApp({
     setup() {
         const scores = ref({
@@ -47,19 +56,17 @@ createApp({
             recommendationFilter.value = '';
             selectedProvince.value = '';
 
-            // 过滤推荐院校：综合分低于或等于用户综合分
+            // 过滤推荐院校：综合分低于或等于用户综合分，并按分数从高到低排序
             recommendations.value = allData.value
                 .filter(item => item.min_composite_score <= userCompositeScore.value)
-                .map(item => {
+                .map(item => ({
+                    ...item,
                     // 智能识别省份
-                    const province = provinceList.find(p => item.college_code_name.includes(p)) || '其他';
-                    return {
-                        ...item,
-                        province,
-                        diff: userCompositeScore.value - item.min_composite_score
-                    };
-                })
-                .sort((a, b) => b.min_composite_score - a.min_composite_score); // 按综合分从高到低排序
+                    province: PROVINCE_LIST.find(p => item.college_code_name.includes(p)) || '其他',
+                    // 计算分数差值
+                    diff: userCompositeScore.value - item.min_composite_score
+                }))
+                .sort((a, b) => b.min_composite_score - a.min_composite_score);
             
             currentPage.value = 1; // 重置页码
 
@@ -79,7 +86,7 @@ createApp({
             referenceArtScore.value = 234;
         };
 
-        const provinceList = ['北京', '天津', '河北', '山西', '内蒙古', '辽宁', '吉林', '黑龙江', '上海', '江苏', '浙江', '安徽', '福建', '江西', '山东', '河南', '湖北', '湖南', '广东', '广西', '海南', '重庆', '四川', '贵州', '云南', '西藏', '陕西', '甘肃', '青海', '宁夏', '新疆'];
+
 
         // 获取推荐结果中的所有省份
         const availableProvinces = computed(() => {
@@ -89,10 +96,16 @@ createApp({
 
         // 应用过滤后的推荐结果
         const filteredRecommendations = computed(() => {
+            const filter = recommendationFilter.value.trim();
+            const province = selectedProvince.value;
+            
             return recommendations.value.filter(item => {
-                const matchSearch = item.college_code_name.includes(recommendationFilter.value) || 
-                                  item.major_code_name.includes(recommendationFilter.value);
-                const matchProvince = !selectedProvince.value || item.province === selectedProvince.value;
+                // 关键词搜索匹配
+                const matchSearch = !filter || 
+                    item.college_code_name.includes(filter) || 
+                    item.major_code_name.includes(filter);
+                // 省份筛选匹配
+                const matchProvince = !province || item.province === province;
                 return matchSearch && matchProvince;
             });
         });
@@ -108,10 +121,11 @@ createApp({
         });
 
         // 动态计算文化课参考分
+        // 公式反推：文化分 = (综合分 - 美术分×1.25) / 0.5
         const calcRefCultureScore = (minCompositeScore) => {
             const refArt = referenceArtScore.value || 0;
-            const res = (minCompositeScore - refArt * 1.25) / 0.5;
-            return res > 0 ? Math.ceil(res) : 0;
+            const calculatedScore = (minCompositeScore - refArt * 1.25) / 0.5;
+            return calculatedScore > 0 ? Math.ceil(calculatedScore) : 0;
         };
 
         // 监听筛选条件变化，重置页码
@@ -119,11 +133,16 @@ createApp({
             currentPage.value = 1;
         });
 
+        // 院校列表（去重缓存）
+        const allColleges = computed(() => {
+            return [...new Set(allData.value.map(item => item.college_code_name))];
+        });
+
         // 院校查询过滤
         const filteredColleges = computed(() => {
-            const colleges = [...new Set(allData.value.map(item => item.college_code_name))];
-            if (!searchQuery.value) return colleges.slice(0, 12); // 默认显示前12个
-            return colleges.filter(name => name.includes(searchQuery.value));
+            const query = searchQuery.value.trim();
+            if (!query) return allColleges.value.slice(0, DEFAULT_COLLEGE_DISPLAY);
+            return allColleges.value.filter(name => name.includes(query));
         });
 
         // 选择院校查看详情
