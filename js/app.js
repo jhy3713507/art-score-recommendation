@@ -11,7 +11,7 @@ createApp({
         const recommendationFilter = ref('');
         const selectedProvince = ref('');
         const currentPage = ref(1);
-        const pageSize = 20;
+        const pageSize = 10;
 
         const searchQuery = ref('');
         const selectedMajor = ref(null);
